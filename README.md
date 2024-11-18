@@ -1,4 +1,4 @@
-## Some youtube video that I watched in the process of making these scripts:
+## Some youtube videos that I watched in the process of making these scripts:
   - Inspiration:
      + https://www.youtube.com/watch?v=GWc7QppCPHM&t=63s
      + https://www.youtube.com/watch?v=rb0EhmyQ0aM&t=305s
@@ -38,3 +38,10 @@
      + https://www.youtube.com/watch?v=BLfNP4Sc_iA&t=859s
   - UI:
      + https://www.youtube.com/watch?v=CPF_zRh4ogM
+## Some websites that I used for researching:
+  - https://docs.unity3d.com/ScriptReference/index.html
+  - https://gamedev.stackexchange.com/?tags=unity
+  - https://discussions.unity.com
+  - https://github.com
+  - https://www.reddit.com/r/Unity3D/
+  - https://chatgpt.com
