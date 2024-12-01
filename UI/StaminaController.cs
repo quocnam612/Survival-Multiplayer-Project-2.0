@@ -1,5 +1,3 @@
-using Microsoft.Unity.VisualStudio.Editor;
-using System.Diagnostics.Tracing;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityStandardAssests.Character.FirstPerson;
