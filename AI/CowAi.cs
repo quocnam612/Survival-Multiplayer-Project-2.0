@@ -1,3 +1,5 @@
+using Photon.Pun.Demo.PunBasics;
+using Photon.Pun;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -31,10 +33,10 @@ public class AI_Movement : MonoBehaviour
         animator = GetComponent<Animator>();
 
         //So that all the prefabs don't move/stop at the same time
+
         walkTime = Random.Range(3, 5);
         waitTime = Random.Range(5, 7);
         eatCounter = Random.Range(1, 9);
-
         waitCounter = waitTime;
         walkCounter = walkTime;
 

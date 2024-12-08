@@ -6,6 +6,8 @@ using UnityEngine.UIElements;
 using TMPro;
 using static UnityEngine.GraphicsBuffer;
 using UnityEngine.SocialPlatforms;
+using System.Collections.Generic;
+using static UnityEngine.Rendering.DebugUI;
 
 namespace UnityStandardAssests.Character.FirstPerson
 {
@@ -15,10 +17,19 @@ namespace UnityStandardAssests.Character.FirstPerson
 
         [Header("Movement")]
         public MovementState state;
+        public enum MovementState { idling, walking, sprinting, air, crouching }
+
+        // speed
         public float moveSpeed;
         public float walkSpeed = 6.5f;
         public float sprintSpeed = 10f;
         public float airMultiplier = 1.2f;
+        public bool isMoving;
+        float tmpmoveSpeed = 0;
+        float leftright = 0;
+
+
+        // effect
         public int sprintFov = 70;
         public Camera playerCamera;
         public TextMeshProUGUI crosshairUI;
@@ -27,7 +38,12 @@ namespace UnityStandardAssests.Character.FirstPerson
         [Range(0f, 10f)] public float sensChangeSpeed;
         [Range(0f, 10f)] public float cameraTiltChangeSpeed;
         [Range(0f, 10f)] public float cameraCrouchChangeSpeed;
+
         public float cameraTiltRange;
+        [HideInInspector] public float cameraTilt = 0;
+        [HideInInspector] public int desireTilt;
+
+        // Zoom
         public int zoomFov = 15;
         private float startFov;
         private bool isZooming = false;
@@ -41,7 +57,11 @@ namespace UnityStandardAssests.Character.FirstPerson
         public float crouchSpeed = 2f;
 
         [Header("Animation")]
-        Animator animator;
+        public Animator animator {
+            get {
+                return GetComponent<Animator>();
+            }
+        }
 
         [Header("Keybinds")]
         public KeyCode sprintKey = KeyCode.LeftShift;
@@ -63,32 +83,40 @@ namespace UnityStandardAssests.Character.FirstPerson
         [HideInInspector] public bool isCrouching = false;
 
         [Header("Menu")]
+        public SelectionManager selectionManager;
         public GameObject pauseMenu;
+        public GameObject inventoryStorage;
         public RectTransform hotBar;
         public GameObject reviewCamera;
         public GameObject interactUI;
 
+        [Header("Craft")]
+        public GameObject craftMenu;
+
+
+        [Header("Respawn")]
+        public float respawnHeight = -50f;
+
         private MouseLook mouseLook;
-        [HideInInspector] public float cameraTilt = 0;
-        [HideInInspector] public int desireTilt;
         private float startMouseXSens;
         private float startMouseYSens;
-        public enum MovementState {idling, walking, sprinting, air, crouching }
-        private bool isMoving;
-        private bool isAttack;
-        float tmpmoveSpeed = 0;
-        float leftright = 0;
-        
+        private bool isInteract = false;
 
         void Start()
         {
             pauseMenu.SetActive(false);
+            craftMenu.SetActive(false);
             reviewCamera.SetActive(false);
+            inventoryStorage.SetActive(false);
+            interactUI.SetActive(true);
+            isInteract = false;
+
             QualitySettings.vSyncCount = 0;
             Application.targetFrameRate = 120;
+
             startFov = playerCamera.fieldOfView;
             mouseLook = playerCamera.GetComponent<MouseLook>();
-            animator = GetComponent<Animator>();
+
             startMouseXSens = mouseLook.mouseXSensitivity;
             startMouseYSens = mouseLook.mouseYSensitivity;
         }
@@ -102,17 +130,44 @@ namespace UnityStandardAssests.Character.FirstPerson
 
             // Open pause menu
             if (Input.GetKeyDown(openMenuKey)) {
-                pauseMenu.SetActive(!pauseMenu.activeSelf);
-                reviewCamera.SetActive(!reviewCamera.activeSelf);
-                interactUI.SetActive(!interactUI.activeSelf);
+                if (isInteract)
+                {
+                    isInteract = false;
+                    craftMenu.SetActive(false);
+                    //cookMenu.SetActive(false);
+                    pauseMenu.SetActive(true);
+                }
+                else
+                {
+                    pauseMenu.SetActive(!pauseMenu.activeSelf);
+                    inventoryStorage.SetActive(!inventoryStorage.activeSelf);
+                    reviewCamera.SetActive(!reviewCamera.activeSelf);
+                    interactUI.SetActive(!interactUI.activeSelf);
+                }
             }
-            if (pauseMenu.activeSelf) {
+
+            // Interact
+            if (!pauseMenu.activeSelf && selectionManager.readyToInteract && Input.GetKeyDown(interactKey))
+            {
+                isInteract = !isInteract;
+                interactUI.SetActive(!interactUI.activeSelf);
+                inventoryStorage.SetActive(!inventoryStorage.activeSelf);
+                craftMenu.SetActive(!craftMenu.activeSelf);
+            }
+
+            // transform hotbar and unlock mouse
+            if (inventoryStorage.activeSelf) {
                 mouseLook.unlockMouse = true;
                 hotBar.localScale = new Vector3(1.469f, 1.469f, 1.469f);
             }
             else {
                 mouseLook.unlockMouse = false;
                 hotBar.localScale = new Vector3(1.1f, 1.1f, 1.1f);
+            }
+
+            // respawn
+            if (transform.position.y < respawnHeight) {
+                gameObject.transform.position = RoomManager.instance.spawnPoint.position;
             }
 
             // Zooming UI crosshair
@@ -136,9 +191,6 @@ namespace UnityStandardAssests.Character.FirstPerson
             }
             cameraTilt = Mathf.SmoothDamp(cameraTilt, desireTilt * cameraTiltRange, ref cameraTiltChangeSpeed, 0.2f);
             playerCamera.transform.localRotation = Quaternion.Euler(mouseLook.xRotation, 0, cameraTilt);
-
-            // Attack
-            checkAttack();
 
             // Check move and crouch
             Vector3 move = transform.right * x + transform.forward * z;
@@ -200,7 +252,15 @@ namespace UnityStandardAssests.Character.FirstPerson
             animator.SetBool("Crouch", isCrouching);
             animator.SetBool("Moving", isMoving);
             animator.SetBool("Zoom", isZooming);
-            animator.SetBool("Attack", isAttack);
+        }
+
+        private void OnTriggerExit(Collider other) {
+            if (isInteract && other.gameObject.transform.parent.GetComponent<InteractableObject>().GetItemName() == "Crafting Table") {
+                isInteract = false;
+                interactUI.SetActive(true);
+                inventoryStorage.SetActive(false);
+                craftMenu.SetActive(false);
+            }
         }
 
         private void StateHandler()
@@ -249,17 +309,6 @@ namespace UnityStandardAssests.Character.FirstPerson
 
         public void Jump() {
             velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
-        }
-
-        private void checkAttack() {
-            if (Input.GetKeyDown(attackKey))
-            {
-                isAttack = true;
-            }
-            else
-            {
-                isAttack = false;
-            }
         }
 
         private void recoverFov() {
