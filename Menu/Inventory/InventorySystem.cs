@@ -52,6 +52,7 @@ public class InventorySystem : MonoBehaviourPunCallbacks
 
     private GameObject itemToAdd;
     private GameObject whatSlotToEquip;
+    private int startEquip;
 
     public bool isFull;
     public bool isHoldingSomething;
@@ -68,7 +69,6 @@ public class InventorySystem : MonoBehaviourPunCallbacks
         {
             string itemPath = "On Hand Global/" + hotBarSlotsUI.transform.GetChild(Mathf.FloorToInt(selectedSlotIndex)).GetChild(0).gameObject.name;
             itemHoldGlobal = PhotonNetwork.Instantiate(itemPath, Resources.Load<GameObject>(itemPath).transform.position, Resources.Load<GameObject>(itemPath).transform.rotation, 0);
-            itemHoldGlobal.GetComponent<PhotonView>().RPC("SetParentToSender", RpcTarget.AllBuffered, PhotonNetwork.LocalPlayer.ActorNumber);
 
             itemHold = Instantiate(Resources.Load<GameObject>("On Hand/" + hotBarSlotsUI.transform.GetChild(Mathf.FloorToInt(selectedSlotIndex)).GetChild(0).gameObject.name), handHold.transform);
         }
@@ -76,7 +76,10 @@ public class InventorySystem : MonoBehaviourPunCallbacks
 
     private void Update()
     {
-        if (!inventoryStorage.activeSelf && (Input.GetAxis("Mouse ScrollWheel") != 0 || Int16.TryParse(Input.inputString, out Int16 n))) {
+        handHold.GetComponent<WeaponAnimationController>().HandleCooldown();
+        startEquip = Mathf.FloorToInt(selectedSlotIndex);
+
+        if (!inventoryStorage.activeSelf && !handHold.GetComponent<WeaponAnimationController>().isOnCooldown && (Input.GetAxis("Mouse ScrollWheel") != 0 || Int16.TryParse(Input.inputString, out Int16 n))) {
             selectedSlotIndex -= Input.GetAxis("Mouse ScrollWheel") * selectionScrollSpeed;
             if (selectedSlotIndex >= 10f)
             {
@@ -98,17 +101,23 @@ public class InventorySystem : MonoBehaviourPunCallbacks
             }
             selectedSlotUI.transform.SetParent(selectSlotsUI.transform.GetChild(Mathf.FloorToInt(selectedSlotIndex)), false);
 
-            updateEquip();
+            if (startEquip != Mathf.FloorToInt(selectedSlotIndex))
+            {
+                StartCoroutine(handHold.GetComponent<WeaponAnimationController>().HandleSwap());
+                transform.root.GetComponent<PhotonView>().RPC("PlayEquipAnimation", RpcTarget.All);
+            }
         }
 
-        
+
         if (itemHold) {
             isHoldingSomething = true;
-            handHold.GetComponent<WeaponAnimationController>().HandleCooldown();
-
-            if (!handHold.GetComponent<WeaponAnimationController>().isSwinging && !handHold.GetComponent<WeaponAnimationController>().isOnCooldown && Input.GetKeyDown(GetComponentInParent<PlayerMovement2>().attackKey))
+            if (photonView.IsMine && !handHold.GetComponent<WeaponAnimationController>().isSwinging && !handHold.GetComponent<WeaponAnimationController>().isOnCooldown && Input.GetKeyDown(GetComponentInParent<PlayerMovement2>().attackKey))
             {
                 handHold.GetComponent<WeaponAnimationController>().SwingWeapon();
+            }
+            else if (photonView.IsMine && hotBarSlotsUI.transform.GetChild(Mathf.FloorToInt(selectedSlotIndex)).childCount != 0 && hotBarSlotsUI.transform.GetChild(Mathf.FloorToInt(selectedSlotIndex)).GetChild(0).GetComponent<DragDrop>().food && !handHold.GetComponent<WeaponAnimationController>().isEating && !handHold.GetComponent<WeaponAnimationController>().isOnCooldown && Input.GetKeyDown(GetComponentInParent<PlayerMovement2>().eatKey)) {
+                handHold.GetComponent<WeaponAnimationController>().EatItem();
+                RemoveFromItemList(hotBarSlotsUI.transform.GetChild(Mathf.FloorToInt(selectedSlotIndex)).GetChild(0).gameObject.name, 1);
             }
             else
             {
@@ -116,8 +125,11 @@ public class InventorySystem : MonoBehaviourPunCallbacks
                 handHold.GetComponent<WeaponAnimationController>().HandleBob();
             }
         }
-        else{
-            isHoldingSomething = false; 
+        else {
+            isHoldingSomething = false;
+            if (photonView.IsMine && !handHold.GetComponent<WeaponAnimationController>().isSwinging && !handHold.GetComponent<WeaponAnimationController>().isOnCooldown && Input.GetKeyDown(GetComponentInParent<PlayerMovement2>().attackKey)) {
+                transform.root.GetComponent<PlayerMovement2>().animator.SetTrigger("Punch");
+            }
         }
     }
 
@@ -127,7 +139,6 @@ public class InventorySystem : MonoBehaviourPunCallbacks
             {
                 string itemPath = "On Hand Global/" + hotBarSlotsUI.transform.GetChild(Mathf.FloorToInt(selectedSlotIndex)).GetChild(0).gameObject.name;
                 itemHoldGlobal = PhotonNetwork.Instantiate(itemPath, Resources.Load<GameObject>(itemPath).transform.position, Resources.Load<GameObject>(itemPath).transform.rotation, 0);
-                itemHoldGlobal.GetComponent<PhotonView>().RPC("SetParentToSender", RpcTarget.AllBuffered, PhotonNetwork.LocalPlayer.ActorNumber);
 
                 itemHold = Instantiate(Resources.Load<GameObject>("On Hand/" + hotBarSlotsUI.transform.GetChild(Mathf.FloorToInt(selectedSlotIndex)).GetChild(0).gameObject.name), handHold.transform);
             }
@@ -135,12 +146,10 @@ public class InventorySystem : MonoBehaviourPunCallbacks
         else {
             Destroy(itemHold);
             PhotonNetwork.Destroy(itemHoldGlobal);
-            if (handHoldGlobal.transform.childCount != 0f) PhotonNetwork.Destroy(handHoldGlobal.transform.GetChild(0).gameObject); 
             if (hotBarSlotsUI.transform.GetChild(Mathf.FloorToInt(selectedSlotIndex)).childCount != 0)
             {
                 string itemPath = "On Hand Global/" + hotBarSlotsUI.transform.GetChild(Mathf.FloorToInt(selectedSlotIndex)).GetChild(0).gameObject.name;
                 itemHoldGlobal = PhotonNetwork.Instantiate(itemPath, Resources.Load<GameObject>(itemPath).transform.position, Resources.Load<GameObject>(itemPath).transform.rotation, 0);
-                itemHoldGlobal.GetComponent<PhotonView>().RPC("SetParentToSender", RpcTarget.AllBuffered, PhotonNetwork.LocalPlayer.ActorNumber);
 
                 itemHold = Instantiate(Resources.Load<GameObject>("On Hand/" + hotBarSlotsUI.transform.GetChild(Mathf.FloorToInt(selectedSlotIndex)).GetChild(0).gameObject.name), handHold.transform);
             }
@@ -173,22 +182,23 @@ public class InventorySystem : MonoBehaviourPunCallbacks
         }
     }
 
-    public void AddToInventory(GameObject item)
+    public void AddToInventory(GameObject item, int count)
     {
         if (CheckIfFull(item))
         {
             isFull = true;
 
         }
-        else if (FindNextSlot(item) != null)
+        else if (FindNextSlot(item, count) != null)
         {
             isFull = false;
-            whatSlotToEquip = FindNextSlot(item);
+            whatSlotToEquip = FindNextSlot(item, count);
             itemToAdd = (GameObject)Instantiate(Resources.Load<GameObject>("Item Slot/" + item.GetComponent<InteractableObject>().GetItemName()), whatSlotToEquip.transform.position, whatSlotToEquip.transform.rotation, whatSlotToEquip.transform);
             itemToAdd.name = item.GetComponent<InteractableObject>().GetItemName();
+            itemToAdd.transform.GetChild(0).GetComponent<Text>().text = count.ToString();
             itemToAdd.transform.localScale = new Vector3(1, 1, 1);
 
-            AddToItemList(item.GetComponent<InteractableObject>().GetItemName(), Int16.Parse(itemToAdd.transform.GetChild(0).GetComponent<Text>().text));
+            AddToItemList(item.GetComponent<InteractableObject>().GetItemName(), count);
         }
         else
         {
@@ -196,16 +206,16 @@ public class InventorySystem : MonoBehaviourPunCallbacks
         }
     }
 
-    private GameObject FindNextSlot(GameObject item)
+    private GameObject FindNextSlot(GameObject item, int count)
     {
         foreach (GameObject slot in slotList)
         {
             if (slot.transform.childCount == 1)
             {
-                if (slot.transform.GetChild(0).gameObject.name == item.GetComponent<InteractableObject>().GetItemName() && Int16.Parse(slot.transform.GetChild(0).GetChild(0).GetComponent<Text>().text) <= maxStack - 1)
+                if (slot.transform.GetChild(0).gameObject.name == item.GetComponent<InteractableObject>().GetItemName() && Int16.Parse(slot.transform.GetChild(0).GetChild(0).GetComponent<Text>().text) <= maxStack - count)
                 {
-                    slot.transform.GetChild(0).GetChild(0).GetComponent<Text>().text = (Int16.Parse(slot.transform.GetChild(0).GetChild(0).GetComponent<Text>().text) + 1).ToString();
-                    AddToItemList(slot.transform.GetChild(0).gameObject.name, 1);
+                    slot.transform.GetChild(0).GetChild(0).GetComponent<Text>().text = (Int16.Parse(slot.transform.GetChild(0).GetChild(0).GetComponent<Text>().text) + count).ToString();
+                    AddToItemList(slot.transform.GetChild(0).gameObject.name, count);
                     return null;
                 }
             }

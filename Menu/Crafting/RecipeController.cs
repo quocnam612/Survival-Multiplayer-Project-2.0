@@ -1,5 +1,3 @@
-using NUnit.Framework;
-using Photon.Pun.Demo.Cockpit;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -33,12 +31,8 @@ public class RecipeController : MonoBehaviour
 
         if (slot) {
             GameObject itemCrafted = (GameObject)Instantiate(Resources.Load("Item Slot/" + recipeName), displayer.transform.GetChild(1).transform.position, displayer.transform.GetChild(1).transform.rotation, displayer.transform.GetChild(1).transform);
-            if (!itemCrafted.GetComponent<DragDrop>().stackable) {
-                displayer.transform.GetChild(0).GetComponent<Text>().text = "Crafted " + recipeName;
-            }
-            else {
-                displayer.transform.GetChild(0).GetComponent<Text>().text = "Crafted " + count + " " + recipeName;
-            }
+            displayer.transform.GetChild(0).GetComponent<Text>().text = "Crafted " + recipeName;
+
 
             foreach (var ingredient in ingredients)
             {

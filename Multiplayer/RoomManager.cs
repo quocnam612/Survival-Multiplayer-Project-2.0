@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using Photon.Pun;
 
@@ -65,11 +63,4 @@ public class RoomManager : MonoBehaviourPunCallbacks
         _player.GetComponent<PlayerSetup>().IsLocalPlayer(nickname);
     }
 
-    private void LateUpdate()
-    {
-        foreach (var kvp in PlayerManager.GetAllRegisteredPlayers())
-        {
-            Debug.Log($"ActorNumber: {kvp.Key}, Object: {kvp.Value}");
-        }
-    }
 }

@@ -28,7 +28,7 @@ public class RoomList : MonoBehaviourPunCallbacks
     public override void OnConnectedToMaster() {
         base.OnConnectedToMaster();
 
-        PhotonNetwork.JoinLobby();
+        PhotonNetwork.JoinLobby(); 
     }
 
     public override void OnRoomListUpdate(List<RoomInfo> roomList) {

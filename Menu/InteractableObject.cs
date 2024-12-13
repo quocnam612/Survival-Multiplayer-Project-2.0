@@ -11,6 +11,8 @@ public class InteractableObject : MonoBehaviourPunCallbacks
     public bool pickable = true;
     public bool interactable = false;
     public bool stackable = true;
+    public bool dropped = false;
+    public int count = 1;
 
     public string GetItemName()
     {

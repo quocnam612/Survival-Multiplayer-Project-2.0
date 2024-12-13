@@ -60,6 +60,13 @@ MonoBehaviour:
   - AttachObjectToHand
   - EquipItem
   - SetParentToSender
+  - updateHealth
+  - TakeDamage
+  - UpdateHealth
+  - SpawnLogs
+  - SpawnLog
+  - WaitForDestroy
+  - PlayEquipAnimation
   DisableAutoOpenWizard: 1
   ShowSettings: 0
   DevRegionSetOnce: 1

@@ -1,8 +1,11 @@
+using Photon.Pun;
+using System;
 using System.Collections;
 using UnityEngine;
+using UnityEngine.UI;
 using UnityStandardAssests.Character.FirstPerson;
 
-public class WeaponAnimationController : MonoBehaviour
+public class WeaponAnimationController : MonoBehaviourPunCallbacks
 {
     [Header("Sway Settings")]
     public float swayAmount = 0.069f;
@@ -21,14 +24,30 @@ public class WeaponAnimationController : MonoBehaviour
     [Header("Swing Settings")]
     [SerializeField] private Quaternion swingAngle;
     [SerializeField] private Vector3 swingPosition;
-    public float swingSpeed = 10f;
-    public float swingReturnSpeed = 5f;
-    public float swingCooldown = 0.2f;
+    public float swingSpeed = 7.654f;
+    public float swingReturnSpeed = 3.456f;
+    public float swingCooldown = 0.3456f;
 
+    [Header("Eat Settings")]
+    [SerializeField] private Quaternion eatAngle;
+    [SerializeField] private Vector3 eatPosition;
+    public float eatSpeed = 1.7f;
+    public float eatReturnSpeed = 1.69f;
+    public float eatCooldown = 0.69f;
+
+    [Header("Swap Item Settings")]
+    [SerializeField] private Vector3 swapBottom;
+    public float swapSpeed = 6.9f;
+
+    public bool isEating = false;
     public bool isSwinging = false;
     public bool isOnCooldown = false;
+    public bool isSwapping = false;
     private float cooldownTimer = 0f;
 
+    public GameObject statBars;
+    public CapsuleCollider hitBox;
+    public InventorySystem inventorySystem;
     private Quaternion originalRotation;
     private Vector3 originalPosition;
     private Vector3 targetPosition;
@@ -43,15 +62,27 @@ public class WeaponAnimationController : MonoBehaviour
         originalRotation = transform.localRotation;
         originalPosition = transform.localPosition;
         targetPosition = originalPosition;
+        hitBox.enabled = false;
     }
 
-    public void SwingWeapon()
-    {
-        transform.root.GetComponent<PlayerMovement2>().animator.SetTrigger("Attack");
-        isSwinging = true;
-        isOnCooldown = true;
-        cooldownTimer = swingCooldown;  
-        StartCoroutine(PerformSwing());
+    public void SwingWeapon() {
+        if (!isSwapping && !isEating) {
+            transform.root.GetComponent<PlayerMovement2>().animator.SetTrigger("Attack");
+            isSwinging = true;
+            isOnCooldown = true;
+            cooldownTimer = swingCooldown;
+            StartCoroutine(PerformSwing());
+        }
+    }
+
+    public void EatItem() {
+        if (!isSwapping && !isSwinging) {
+            transform.root.GetComponent<PlayerMovement2>().animator.SetTrigger("Eat");
+            isEating = true;
+            isOnCooldown = true;
+            cooldownTimer = eatCooldown;
+            StartCoroutine(PerformEat());
+        }
     }
 
     public void HandleCooldown()
@@ -76,7 +107,8 @@ public class WeaponAnimationController : MonoBehaviour
             transform.localRotation = Quaternion.Slerp(originalRotation, swingAngle, elapsedTime);
             yield return null;
         }
-
+        hitBox.enabled = true;
+        
         elapsedTime = 0f;
         while (elapsedTime < 1f)
         {
@@ -85,8 +117,44 @@ public class WeaponAnimationController : MonoBehaviour
             transform.localRotation = Quaternion.Lerp(swingAngle, originalRotation, elapsedTime);
             yield return null;
         }
-
+        hitBox.enabled = false;
         isSwinging = false;
+    }
+
+    private IEnumerator PerformEat()
+    {
+        float elapsedTime = 0f;
+        while (elapsedTime < 1f)
+        {
+            elapsedTime += Time.deltaTime * eatSpeed;
+            transform.localPosition = Vector3.Slerp(originalPosition, eatPosition, elapsedTime);
+            transform.localRotation = Quaternion.Slerp(originalRotation, eatAngle, elapsedTime);
+            yield return null;
+        }
+
+        elapsedTime = 0f;
+
+        statBars.GetComponent<HungerController>().hungerAdd(inventorySystem.hotBarSlotsUI.transform.GetChild(Mathf.FloorToInt(inventorySystem.selectedSlotIndex)).GetChild(0).GetComponent<DragDrop>().cal);
+        statBars.GetComponent<HealthController>().addHealth(inventorySystem.hotBarSlotsUI.transform.GetChild(Mathf.FloorToInt(inventorySystem.selectedSlotIndex)).GetChild(0).GetComponent<DragDrop>().heal);
+        inventorySystem.countInventory -= 1;
+
+        if (Int16.Parse(inventorySystem.hotBarSlotsUI.transform.GetChild(Mathf.FloorToInt(inventorySystem.selectedSlotIndex)).GetChild(0).transform.GetChild(0).GetComponent<Text>().text) == 1) {
+            Destroy(inventorySystem.hotBarSlotsUI.transform.GetChild(Mathf.FloorToInt(inventorySystem.selectedSlotIndex)).GetChild(0).gameObject);
+            Destroy(inventorySystem.itemHold);
+            PhotonNetwork.Destroy(inventorySystem.handHoldGlobal.transform.GetChild(0).gameObject);
+        }
+        else {
+            inventorySystem.hotBarSlotsUI.transform.GetChild(Mathf.FloorToInt(inventorySystem.selectedSlotIndex)).GetChild(0).transform.GetChild(0).GetComponent<Text>().text = (Int16.Parse(inventorySystem.hotBarSlotsUI.transform.GetChild(Mathf.FloorToInt(inventorySystem.selectedSlotIndex)).GetChild(0).transform.GetChild(0).GetComponent<Text>().text) - 1).ToString();
+        }
+
+        while (elapsedTime < 1f)
+        {
+            elapsedTime += Time.deltaTime * eatReturnSpeed;
+            transform.localPosition = Vector3.Lerp(eatPosition, originalPosition, elapsedTime);
+            transform.localRotation = Quaternion.Lerp(eatAngle, originalRotation, elapsedTime);
+            yield return null;
+        }
+        isEating = false;
     }
 
     public void HandleSway()
@@ -122,5 +190,25 @@ public class WeaponAnimationController : MonoBehaviour
         }
 
         transform.localPosition = Vector3.Lerp(transform.localPosition, targetPosition, Time.deltaTime * (!transform.root.GetComponent<PlayerMovement2>().grounded ? jumpSmoothness : swaySmoothness));
+    }
+
+    public IEnumerator HandleSwap() {
+        isSwapping = true;
+        float elapsedTime = 0f;
+        while (elapsedTime < 1f) {
+            elapsedTime += Time.deltaTime * swapSpeed;
+            transform.localPosition = Vector3.Lerp(originalPosition, swapBottom, elapsedTime);
+            yield return null;
+        }
+
+        inventorySystem.updateEquip();
+        elapsedTime = 0f;
+        while (elapsedTime < 1f)
+        {
+            elapsedTime += Time.deltaTime * swapSpeed;
+            transform.localPosition = Vector3.Lerp(swapBottom, originalPosition, elapsedTime);
+            yield return null;
+        }
+        isSwapping = false;
     }
 }

@@ -33,13 +33,35 @@ public class SelectionManager : MonoBehaviourPunCallbacks
                     if (selectionTransform.GetComponent<InteractableObject>().enabled) interaction_text.text = "<i>" + selectionTransform.GetComponent<InteractableObject>().GetItemName() + "</i>";
                     else interaction_text.enabled = false;
                 }
+                else if (selectionTransform.GetComponent<InteractableObject>().dropped) {
+                    interaction_text.text = "[" + playerMovement.pickUpKey + "] Pick up dropped <b>" + selectionTransform.GetComponent<InteractableObject>().GetItemName() + "</b>";
+
+                    if (Input.GetKeyDown(playerMovement.pickUpKey))
+                    {
+                        inventorySystem.AddToInventory(selectionTransform.gameObject, selectionTransform.GetComponent<InteractableObject>().count);
+                        if (inventorySystem.isFull)
+                        {
+                            annoucementDisplayer.updateAction("Inventory is FULL");
+                        }
+                        else
+                        {
+                            if (selectionTransform.GetComponent<InteractableObject>().stackable) {
+                                annoucementDisplayer.updateAction("Picked up " + selectionTransform.GetComponent<InteractableObject>().count + " " + hit.transform.gameObject.GetComponent<InteractableObject>().GetItemName());
+                            }
+                            else {
+                                annoucementDisplayer.updateAction("Picked up 1" + hit.transform.gameObject.GetComponent<InteractableObject>().GetItemName());
+                            }
+                            hit.transform.gameObject.GetComponent<PhotonView>().RPC("NetworkDestroy", RpcTarget.AllBuffered);
+                        }
+                    }
+                }
                 else if (selectionTransform.GetComponent<InteractableObject>().pickable)
                 {
                     interaction_text.text = "[" + playerMovement.pickUpKey + "] Pick up <b>" + selectionTransform.GetComponent<InteractableObject>().GetItemName() + "</b>";
 
                     if (Input.GetKeyDown(playerMovement.pickUpKey))
                     {
-                        inventorySystem.AddToInventory(hit.transform.gameObject);
+                        inventorySystem.AddToInventory(hit.transform.gameObject, 1);
                         if (inventorySystem.isFull)
                         {
                             annoucementDisplayer.updateAction("Inventory is FULL");
@@ -62,9 +84,13 @@ public class SelectionManager : MonoBehaviourPunCallbacks
                     interaction_text.text += "\n" + "[" + playerMovement.interactKey + "] Interact";
                     readyToInteract = true;
                     isCraft = false;
+                    isCook = false;
                     switch (selectionTransform.GetComponent<InteractableObject>().GetItemName()) {
                         case "Crafting Table":
                             isCraft = true;
+                            break;
+                        case "Campfire":
+                            isCook = true;
                             break;
                         default:
                             Debug.Log("INTERACTED");

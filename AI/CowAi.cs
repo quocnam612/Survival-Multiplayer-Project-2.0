@@ -9,7 +9,7 @@ using static UnityEngine.GraphicsBuffer;
 public class AI_Movement : MonoBehaviour
 {
 
-    Animator animator;
+    public Animator animator;
 
     public float moveSpeed = 0.2f;
 
@@ -20,9 +20,8 @@ public class AI_Movement : MonoBehaviour
     float waitTime;
     public float waitCounter;
     public float eatCounter;
-    public float cowRotationSPeed = 2f;
-    private float cowRotation;
-
+    public float rotationSPeed = 2f;
+    private float rotation;
     int WalkDirection;
 
     public bool isWalking;
@@ -46,87 +45,96 @@ public class AI_Movement : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if (isWalking)
-        {
-            animator.SetBool("isWalking", true);
-            walkCounter -= Time.deltaTime;
+        if (FindFirstObjectByType<LightingManager>().TimeOfDay < 4 || FindFirstObjectByType<LightingManager>().TimeOfDay > 20f) {
+            animator.SetBool("Sleep", true);
+        } 
+        else {
+            animator.SetBool("Sleep", false);
 
-            switch (WalkDirection)
+            if (isWalking)
             {
-                case 0:
-                    cowRotation = Mathf.SmoothDamp(cowRotation, 0, ref cowRotationSPeed, 0.2f);
-                    transform.rotation = Quaternion.Euler(0, cowRotation, 0);
-                    transform.position += transform.forward * moveSpeed * Time.deltaTime;
-                    break;
-                case 1:
-                    cowRotation = Mathf.SmoothDamp(cowRotation, 45f, ref cowRotationSPeed, 0.2f);
-                    transform.rotation = Quaternion.Euler(0, cowRotation, 0);
-                    transform.position += transform.forward * moveSpeed * Time.deltaTime;
-                    break;
-                case 2:
-                    cowRotation = Mathf.SmoothDamp(cowRotation, 90f, ref cowRotationSPeed, 0.2f);
-                    transform.rotation = Quaternion.Euler(0, cowRotation, 0);
-                    transform.position += transform.forward * moveSpeed * Time.deltaTime;
-                    break;
-                case 3:
-                    cowRotation = Mathf.SmoothDamp(cowRotation, 135f, ref cowRotationSPeed, 0.2f);
-                    transform.rotation = Quaternion.Euler(0, cowRotation, 0);
-                    transform.position += transform.forward * moveSpeed * Time.deltaTime;
-                    break;
-                case 4:
-                    cowRotation = Mathf.SmoothDamp(cowRotation, 180f, ref cowRotationSPeed, 0.2f);
-                    transform.rotation = Quaternion.Euler(0, cowRotation, 0);
-                    transform.position += transform.forward * moveSpeed * Time.deltaTime;
-                    break;
-                case 5:
-                    cowRotation = Mathf.SmoothDamp(cowRotation, -45f, ref cowRotationSPeed, 0.2f);
-                    transform.rotation = Quaternion.Euler(0, cowRotation, 0);
-                    transform.position += transform.forward * moveSpeed * Time.deltaTime;
-                    break;
-                case 6:
-                    cowRotation = Mathf.SmoothDamp(cowRotation, -90f, ref cowRotationSPeed, 0.2f);
-                    transform.rotation = Quaternion.Euler(0, cowRotation, 0);
-                    transform.position += transform.forward * moveSpeed * Time.deltaTime;
-                    break;
-                case 7:
-                    cowRotation = Mathf.SmoothDamp(cowRotation, -135f, ref cowRotationSPeed, 0.2f);
-                    transform.rotation = Quaternion.Euler(0, cowRotation, 0);
-                    transform.position += transform.forward * moveSpeed * Time.deltaTime;
-                    break;
-            }
+                animator.SetBool("isWalking", true);
+                walkCounter -= Time.deltaTime;
 
-            if (walkCounter <= 0)
+                switch (WalkDirection)
+                {
+                    case 0:
+                        rotation = Mathf.SmoothDamp(rotation, 0, ref rotationSPeed, 0.2f);
+                        transform.rotation = Quaternion.Euler(0, rotation, 0);
+                        transform.position += transform.forward * moveSpeed * Time.deltaTime;
+                        break;
+                    case 1:
+                        rotation = Mathf.SmoothDamp(rotation, 45f, ref rotationSPeed, 0.2f);
+                        transform.rotation = Quaternion.Euler(0, rotation, 0);
+                        transform.position += transform.forward * moveSpeed * Time.deltaTime;
+                        break;
+                    case 2:
+                        rotation = Mathf.SmoothDamp(rotation, 90f, ref rotationSPeed, 0.2f);
+                        transform.rotation = Quaternion.Euler(0, rotation, 0);
+                        transform.position += transform.forward * moveSpeed * Time.deltaTime;
+                        break;
+                    case 3:
+                        rotation = Mathf.SmoothDamp(rotation, 135f, ref rotationSPeed, 0.2f);
+                        transform.rotation = Quaternion.Euler(0, rotation, 0);
+                        transform.position += transform.forward * moveSpeed * Time.deltaTime;
+                        break;
+                    case 4:
+                        rotation = Mathf.SmoothDamp(rotation, 180f, ref rotationSPeed, 0.2f);
+                        transform.rotation = Quaternion.Euler(0, rotation, 0);
+                        transform.position += transform.forward * moveSpeed * Time.deltaTime;
+                        break;
+                    case 5:
+                        rotation = Mathf.SmoothDamp(rotation, -45f, ref rotationSPeed, 0.2f);
+                        transform.rotation = Quaternion.Euler(0, rotation, 0);
+                        transform.position += transform.forward * moveSpeed * Time.deltaTime;
+                        break;
+                    case 6:
+                        rotation = Mathf.SmoothDamp(rotation, -90f, ref rotationSPeed, 0.2f);
+                        transform.rotation = Quaternion.Euler(0, rotation, 0);
+                        transform.position += transform.forward * moveSpeed * Time.deltaTime;
+                        break;
+                    case 7:
+                        rotation = Mathf.SmoothDamp(rotation, -135f, ref rotationSPeed, 0.2f);
+                        transform.rotation = Quaternion.Euler(0, rotation, 0);
+                        transform.position += transform.forward * moveSpeed * Time.deltaTime;
+                        break;
+                }
+
+                if (walkCounter <= 0)
+                {
+                    stopPosition = new Vector3(transform.position.x, transform.position.y, transform.position.z);
+                    isWalking = false;
+
+                    //stop movement
+                    transform.position = stopPosition;
+                    animator.SetBool("isWalking", false);
+
+                    //reset the waitCounter
+                    waitCounter = waitTime;
+                }
+
+
+            }
+            else
             {
-                stopPosition = new Vector3(transform.position.x, transform.position.y, transform.position.z);
-                isWalking = false;
-                
-                //stop movement
-                transform.position = stopPosition;
-                animator.SetBool("isWalking", false);
 
-                //reset the waitCounter
-                waitCounter = waitTime;
-            }
+                waitCounter -= Time.deltaTime;
+                eatCounter -= Time.deltaTime;
 
+                if (eatCounter <= 0)
+                {
+                    animator.SetBool("EAT", false);
+                }
+                else if (waitCounter > eatCounter)
+                {
+                    animator.SetBool("EAT", true);
+                }
 
-        }
-        else
-        {
-
-            waitCounter -= Time.deltaTime;
-            eatCounter -= Time.deltaTime;
-
-            if (eatCounter <= 0) {
-                animator.SetBool("EAT", false);
-            }
-            else if (waitCounter > eatCounter) { 
-                animator.SetBool("EAT", true); 
-            }
-
-            if (waitCounter <= 0)
-            {
-                ChooseDirection();
-                eatCounter = Random.Range(1, 9);
+                if (waitCounter <= 0)
+                {
+                    ChooseDirection();
+                    eatCounter = Random.Range(1, 9);
+                }
             }
         }
     }

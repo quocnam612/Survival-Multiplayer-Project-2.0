@@ -1,19 +1,18 @@
-using System.Data.SqlTypes;
-using Unity.VisualScripting;
 using UnityEngine;
-using UnityEngine.UI;
-using UnityEngine.UIElements;
 using TMPro;
-using static UnityEngine.GraphicsBuffer;
 using UnityEngine.SocialPlatforms;
-using System.Collections.Generic;
-using static UnityEngine.Rendering.DebugUI;
+using Photon.Pun;
+using Photon.Pun.Demo.PunBasics;
 
 namespace UnityStandardAssests.Character.FirstPerson
 {
     public class PlayerMovement2 : MonoBehaviour
     {
         public CharacterController controller;
+
+        [Header("Die")]
+        [Range(0f, 10f)] public float cameraDieChangeSpeed;
+        public GameObject diedScreen; 
 
         [Header("Movement")]
         public MovementState state;
@@ -68,6 +67,7 @@ namespace UnityStandardAssests.Character.FirstPerson
         public KeyCode crouchKey = KeyCode.LeftControl;
         public KeyCode zoomKey = KeyCode.Z;
         public KeyCode attackKey = KeyCode.Mouse0;
+        public KeyCode eatKey = KeyCode.Mouse1;
         public KeyCode pickUpKey = KeyCode.F;
         public KeyCode openMenuKey = KeyCode.Tab;
         public KeyCode interactKey = KeyCode.E;
@@ -93,6 +93,8 @@ namespace UnityStandardAssests.Character.FirstPerson
         [Header("Craft")]
         public GameObject craftMenu;
 
+        [Header("Cook")]
+        public GameObject cookMenu;
 
         [Header("Respawn")]
         public float respawnHeight = -50f;
@@ -101,11 +103,13 @@ namespace UnityStandardAssests.Character.FirstPerson
         private float startMouseXSens;
         private float startMouseYSens;
         private bool isInteract = false;
+        public bool playerDied = false;
 
         void Start()
         {
             pauseMenu.SetActive(false);
             craftMenu.SetActive(false);
+            cookMenu.SetActive(false);
             reviewCamera.SetActive(false);
             inventoryStorage.SetActive(false);
             interactUI.SetActive(true);
@@ -123,143 +127,162 @@ namespace UnityStandardAssests.Character.FirstPerson
 
         void Update()
         {
-            // Check ground and perform gravity
-            StateHandler();
-            grounded = Physics.CheckSphere(groundcheck.position, groundDistance, groundMask);
-            if (grounded && velocity.y < 0) velocity.y = -2f;
+            if (!playerDied) {
+                StateHandler();
+                grounded = Physics.CheckSphere(groundcheck.position, groundDistance, groundMask);
+                if (grounded && velocity.y < 0) velocity.y = -2f;
 
-            // Open pause menu
-            if (Input.GetKeyDown(openMenuKey)) {
-                if (isInteract)
-                {
-                    isInteract = false;
-                    craftMenu.SetActive(false);
-                    //cookMenu.SetActive(false);
-                    pauseMenu.SetActive(true);
+                // Open pause menu
+                if (Input.GetKeyDown(openMenuKey)) {
+                    if (isInteract)
+                    {
+                        isInteract = false;
+                        craftMenu.SetActive(false);
+                        cookMenu.SetActive(false);
+                        pauseMenu.SetActive(true);
+                    }
+                    else
+                    {
+                        pauseMenu.SetActive(!pauseMenu.activeSelf);
+                        inventoryStorage.SetActive(!inventoryStorage.activeSelf);
+                        reviewCamera.SetActive(!reviewCamera.activeSelf);
+                        interactUI.SetActive(!interactUI.activeSelf);
+                    }
                 }
-                else
+
+                // Interact
+                if (!pauseMenu.activeSelf && selectionManager.readyToInteract && Input.GetKeyDown(interactKey))
                 {
-                    pauseMenu.SetActive(!pauseMenu.activeSelf);
-                    inventoryStorage.SetActive(!inventoryStorage.activeSelf);
-                    reviewCamera.SetActive(!reviewCamera.activeSelf);
+                    isInteract = !isInteract;
                     interactUI.SetActive(!interactUI.activeSelf);
+                    inventoryStorage.SetActive(!inventoryStorage.activeSelf);
+                    if (selectionManager.isCraft) {
+                        craftMenu.SetActive(!craftMenu.activeSelf);
+                    }
+                    else if (selectionManager.isCook) {
+                        cookMenu.SetActive(!cookMenu.activeSelf);
+                    }
                 }
-            }
 
-            // Interact
-            if (!pauseMenu.activeSelf && selectionManager.readyToInteract && Input.GetKeyDown(interactKey))
-            {
-                isInteract = !isInteract;
-                interactUI.SetActive(!interactUI.activeSelf);
-                inventoryStorage.SetActive(!inventoryStorage.activeSelf);
-                craftMenu.SetActive(!craftMenu.activeSelf);
-            }
+                // transform hotbar and unlock mouse
+                if (inventoryStorage.activeSelf) {
+                    mouseLook.unlockMouse = true;
+                    hotBar.localScale = new Vector3(1.469f, 1.469f, 1.469f);
+                }
+                else {
+                    mouseLook.unlockMouse = false;
+                    hotBar.localScale = new Vector3(1.1f, 1.1f, 1.1f);
+                }
 
-            // transform hotbar and unlock mouse
-            if (inventoryStorage.activeSelf) {
-                mouseLook.unlockMouse = true;
-                hotBar.localScale = new Vector3(1.469f, 1.469f, 1.469f);
+                // respawn
+                if (transform.position.y < respawnHeight) {
+                    gameObject.transform.position = RoomManager.instance.spawnPoint.position;
+                }
+
+                // Zooming UI crosshair
+                if (isZooming) crosshairUI.text = "+";
+                else crosshairUI.text = "•";
+
+                // Move AWSD
+                float x = Input.GetAxis("Horizontal");
+                float z = Input.GetAxis("Vertical");
+
+                // Player camera tilt
+                if (Input.GetAxisRaw("Horizontal") == -1) {
+                    desireTilt = 1;
+                }
+                else if (Input.GetAxisRaw("Horizontal") == 1)
+                {
+                    desireTilt = -1;
+                }
+                else {
+                    desireTilt = 0;
+                }
+                cameraTilt = Mathf.SmoothDamp(cameraTilt, desireTilt * cameraTiltRange, ref cameraTiltChangeSpeed, 0.2f);
+                playerCamera.transform.localRotation = Quaternion.Euler(mouseLook.xRotation, 0, cameraTilt);
+
+                // Check move and crouch
+                Vector3 move = transform.right * x + transform.forward * z;
+                if (move == Vector3.zero) isMoving = false;
+                else {
+                    controller.Move(move * moveSpeed * Time.deltaTime);
+                    isMoving = true;
+                }
+                if (Input.GetKeyDown(crouchKey) && !isCrouching)
+                {
+                    isCrouching = true;
+                }
+                else if (Input.GetKeyUp(crouchKey) && isCrouching)
+                {
+                    isCrouching = false;
+                }
+                if (state == MovementState.crouching) {
+                    // Move player camera
+                    float newPosition1 = Mathf.SmoothDamp(playerCamera.transform.position.y, groundcheck.transform.position.y + 1.11f, ref cameraCrouchChangeSpeed, 0.1f);
+                    playerCamera.transform.position = new Vector3(transform.position.x, newPosition1, transform.position.z);
+                    // Move player collider
+                    controller.center = new Vector3(controller.center.x, 0.7f, controller.center.z);
+                    controller.height = 1.45f;
+                    controller.radius = 0.45f;
+                }
+                else {
+                    // Move player camera
+                    float newPosition1 = Mathf.SmoothDamp(playerCamera.transform.position.y, groundcheck.transform.position.y + 1.61f, ref cameraCrouchChangeSpeed, 0.1f);
+                    playerCamera.transform.position = new Vector3(transform.position.x, newPosition1, transform.position.z);
+                    // Move player collider
+                    controller.center = new Vector3(controller.center.x, 0.9f, controller.center.z);
+                    controller.height = 1.8f;
+                    controller.radius = 0.3f;
+                }
+
+                velocity.y += gravity * Time.deltaTime;
+                controller.Move(velocity * Time.deltaTime);
+
+                // Animation based on variables
+                if (z > 0)
+                {
+                    adjustSpeed(-(moveSpeed), speedChangeSpeed);
+                    adjustLeftRight(Input.GetAxisRaw("Horizontal") / 2, speedChangeSpeed / 9f);
+                }
+                else if (z < 0)
+                {
+                    adjustSpeed(moveSpeed, speedChangeSpeed);
+                    adjustLeftRight(Input.GetAxisRaw("Horizontal") / 2, speedChangeSpeed / 9f);
+                }
+                else {
+                    adjustSpeed(moveSpeed, speedChangeSpeed);
+                    adjustLeftRight(Input.GetAxisRaw("Horizontal"), speedChangeSpeed / 9f);
+                }
+
+                animator.SetFloat("Speed", tmpmoveSpeed / -8.9f);
+                animator.SetFloat("Horizontal", leftright);
+                animator.SetFloat("headTilt", mouseLook.xRotation);
+                animator.SetBool("Jump", grounded);
+                animator.SetBool("Crouch", isCrouching);
+                animator.SetBool("Moving", isMoving);
+                animator.SetBool("Zoom", isZooming);
             }
             else {
-                mouseLook.unlockMouse = false;
-                hotBar.localScale = new Vector3(1.1f, 1.1f, 1.1f);
-            }
-
-            // respawn
-            if (transform.position.y < respawnHeight) {
-                gameObject.transform.position = RoomManager.instance.spawnPoint.position;
-            }
-
-            // Zooming UI crosshair
-            if (isZooming) crosshairUI.text = "+"; 
-            else crosshairUI.text = "•";
-
-            // Move AWSD
-            float x = Input.GetAxis("Horizontal");
-            float z = Input.GetAxis("Vertical");
-
-            // Player camera tilt
-            if (Input.GetAxisRaw("Horizontal") == -1) {
-                desireTilt = 1;
-            }
-            else if (Input.GetAxisRaw("Horizontal") == 1)
-            {
-                desireTilt = -1;
-            }
-            else {
-                desireTilt = 0;
-            }
-            cameraTilt = Mathf.SmoothDamp(cameraTilt, desireTilt * cameraTiltRange, ref cameraTiltChangeSpeed, 0.2f);
-            playerCamera.transform.localRotation = Quaternion.Euler(mouseLook.xRotation, 0, cameraTilt);
-
-            // Check move and crouch
-            Vector3 move = transform.right * x + transform.forward * z;
-            if (move == Vector3.zero) isMoving = false;
-            else {
-                controller.Move(move * moveSpeed * Time.deltaTime);
-                isMoving = true;
-            }
-            if (Input.GetKeyDown(crouchKey) && !isCrouching)
-            {
-                isCrouching = true;
-            }
-            else if (Input.GetKeyUp(crouchKey) && isCrouching)
-            {
-                isCrouching = false;
-            }
-            if (state == MovementState.crouching) {
-                // Move player camera
-                float newPosition1 = Mathf.SmoothDamp(playerCamera.transform.position.y, groundcheck.transform.position.y + 1.11f, ref cameraCrouchChangeSpeed, 0.1f);
-                playerCamera.transform.position = new Vector3(transform.position.x, newPosition1, transform.position.z);
-                // Move player collider
-                controller.center = new Vector3(controller.center.x, 0.7f, controller.center.z);
-                controller.height = 1.45f;
-                controller.radius = 0.45f;
-            }
-            else {
-                // Move player camera
-                float newPosition1 = Mathf.SmoothDamp(playerCamera.transform.position.y, groundcheck.transform.position.y + 1.61f, ref cameraCrouchChangeSpeed, 0.1f);
-                playerCamera.transform.position = new Vector3(transform.position.x, newPosition1, transform.position.z);
-                // Move player collider
-                controller.center = new Vector3(controller.center.x, 0.9f, controller.center.z);
-                controller.height = 1.8f;
-                controller.radius = 0.3f;
-            }
-
-            velocity.y += gravity * Time.deltaTime;
-            controller.Move(velocity * Time.deltaTime);
-
-            // Animation based on variables
-            if (z > 0)
-            {
-                adjustSpeed(-(moveSpeed), speedChangeSpeed);
-                adjustLeftRight(Input.GetAxisRaw("Horizontal") / 2, speedChangeSpeed / 9f);
-            }
-            else if (z < 0)
-            {
-                adjustSpeed(moveSpeed, speedChangeSpeed);
-                adjustLeftRight(Input.GetAxisRaw("Horizontal") / 2, speedChangeSpeed / 9f);
-            }
-            else {
-                adjustSpeed(moveSpeed, speedChangeSpeed);
-                adjustLeftRight(Input.GetAxisRaw("Horizontal"), speedChangeSpeed / 9f);
-            }
-
-            animator.SetFloat("Speed", tmpmoveSpeed / -8.9f);
-            animator.SetFloat("Horizontal", leftright);
-            animator.SetFloat("headTilt", mouseLook.xRotation);
-            animator.SetBool("Jump", grounded);
-            animator.SetBool("Crouch", isCrouching);
-            animator.SetBool("Moving", isMoving);
-            animator.SetBool("Zoom", isZooming);
+                mouseLook.enabled = false;
+                diedScreen.SetActive(true);
+                playerCamera.transform.GetChild(0).gameObject.SetActive(false);
+                GetComponent<PlayerSetup>().playerUI.enabled = false;
+                playerCamera.transform.localPosition = Vector3.Lerp(playerCamera.transform.localPosition, new Vector3(0.122f, 0.08f, 0.57f), cameraDieChangeSpeed);
+            }   
         }
 
         private void OnTriggerExit(Collider other) {
-            if (isInteract && other.gameObject.transform.parent.GetComponent<InteractableObject>().GetItemName() == "Crafting Table") {
+            if (isInteract && craftMenu.activeSelf && other.CompareTag("Interact Zone") && other.gameObject.transform.parent.GetComponent<InteractableObject>().GetItemName() == "Crafting Table") {
                 isInteract = false;
                 interactUI.SetActive(true);
                 inventoryStorage.SetActive(false);
                 craftMenu.SetActive(false);
+            }
+            if (isInteract && cookMenu.activeSelf && other.CompareTag("Interact Zone") && other.gameObject.transform.parent.GetComponent<InteractableObject>().GetItemName() == "Campfire") {
+                isInteract = false;
+                interactUI.SetActive(true);
+                inventoryStorage.SetActive(false);
+                cookMenu.SetActive(false);
             }
         }
 
@@ -378,6 +401,12 @@ namespace UnityStandardAssests.Character.FirstPerson
             {
                 leftright = desireTurn;
             }
+        }
+
+        [PunRPC]
+        public void PlayEquipAnimation()
+        {
+            transform.root.GetComponent<PlayerMovement2>().animator.SetTrigger("Equip");
         }
     }
 }

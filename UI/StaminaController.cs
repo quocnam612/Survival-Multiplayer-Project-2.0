@@ -23,6 +23,11 @@ public class StaminaController : MonoBehaviour {
     public Color minStaminaColor = new Color(255, 100, 0);
     
     public PlayerMovement2 playerController;
+    public HungerController hungerController {
+        get {
+            return GetComponent<HungerController>();
+        }
+    }
     private float startStaminaRegen;
 
     private void Start() {
@@ -31,18 +36,17 @@ public class StaminaController : MonoBehaviour {
     }
 
     private void Update() {
-        if (Input.GetButton("Jump") && playerController.grounded && playerController.readyToJump && isRegenerated)
+        if (Input.GetButton("Jump") && playerController.grounded && playerController.readyToJump && isRegenerated && hungerController.playerHunger > 1f)
         {
             playerController.readyToJump = false;
             playerController.Jump();
             playerStamina -= jumpStamina;
-            UpdateStamina();
             Invoke(nameof(ResetJump), playerController.jumpCooldown);
         }
         else if (playerController.state != PlayerMovement2.MovementState.sprinting) { 
-            if (playerStamina < maxStamina) {
+            if (playerStamina < maxStamina && hungerController.playerHunger > 1f) {
                 playerStamina += staminaRegen * Time.deltaTime;
-                UpdateStamina();
+                hungerController.hungerReduceDrainSprint();
         
                 if (playerStamina >= minStamina) {
                     isRegenerated = true;
@@ -59,7 +63,6 @@ public class StaminaController : MonoBehaviour {
                 playerController.readytoSprint = true;
                 if (playerController.state == PlayerMovement2.MovementState.sprinting) {
                     playerStamina -= staminaDrain * Time.deltaTime;
-                    UpdateStamina();
                 }
             }
             else
@@ -67,6 +70,12 @@ public class StaminaController : MonoBehaviour {
                 playerController.readytoSprint = false;
             }
         }
+
+        if (hungerController.playerHunger > 1f) {
+            hungerController.hungerReduceDrainNormal();
+        }
+        hungerController.UpdateHunger();
+        UpdateStamina();
     }
 
     public void ResetJump()

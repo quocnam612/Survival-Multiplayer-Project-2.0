@@ -1,10 +1,6 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.Rendering.VirtualTexturing;
 using UnityEngine.UI;
 
 public class DragDrop : MonoBehaviour, IBeginDragHandler, IEndDragHandler, IDragHandler
@@ -42,6 +38,13 @@ public class DragDrop : MonoBehaviour, IBeginDragHandler, IEndDragHandler, IDrag
     [Space]
     public bool weapon = true;
     public float damage = 0f;
+    [Space]
+    public bool cookable = false;
+    public string cookedItem;
+    public float cookTime;
+    [Space]
+    public bool isFuel = false;
+    public float energy;
 
     private RectTransform rectTransform;
     private CanvasGroup canvasGroup;
@@ -67,7 +70,7 @@ public class DragDrop : MonoBehaviour, IBeginDragHandler, IEndDragHandler, IDrag
         startParent = transform.parent;
         transform.SetParent(canvas.transform);
         itemBeingDragged = gameObject;
-        if (!stackable && eventData.button == PointerEventData.InputButton.Right && Int16.Parse(count.text) != 1)
+        if (stackable && eventData.button == PointerEventData.InputButton.Right && Int16.Parse(count.text) != 1)
         {
             GameObject tmp = (GameObject)Instantiate(Resources.Load<GameObject>("Item Slot/" + name), startParent.transform.position, startParent.transform.rotation, startParent.transform);
             tmp.name = name;
