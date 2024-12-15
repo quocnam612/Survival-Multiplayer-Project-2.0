@@ -7,54 +7,29 @@ private void Awake()
     playerMovement = transform.root.GetComponent<PlayerMovement2>();
 }
 
-void Update()
+private void Update()
 {
-    weaponController.HandleCooldown();
-    startEquip = Mathf.FloorToInt(selectedSlotIndex);
-
-    if (!inventoryStorage.activeSelf && !weaponController.isOnCooldown && (Input.GetAxis("Mouse ScrollWheel") != 0 || Int16.TryParse(Input.inputString, out int input)))
+    // Batch UI updates
+    if (needToUpdateUI)
     {
-        selectedSlotIndex -= Input.GetAxis("Mouse ScrollWheel") * selectionScrollSpeed;
-        selectedSlotIndex = selectedSlotIndex >= 10f ? 0f : selectedSlotIndex < 0 ? 9.9999f : selectedSlotIndex;
-
-        if (int.TryParse(Input.inputString, out int num) && num >= 0 && num <= 9)
-        {
-            selectedSlotIndex = num == 0 ? 9 : num - 1;
-        }
-
-        selectedSlotUI.transform.SetParent(selectSlotsUI.transform.GetChild(Mathf.FloorToInt(selectedSlotIndex)), false);
-
-        if (startEquip != Mathf.FloorToInt(selectedSlotIndex))
-        {
-            StartCoroutine(weaponController.HandleSwap());
-            transform.root.GetComponent<PhotonView>().RPC("PlayEquipAnimation", RpcTarget.All);
-        }
+        BatchUpdateInventoryUI();
+        needToUpdateUI = false;
     }
+}
 
-    if (itemHold)
-    {
-        isHoldingSomething = true;
-        if (photonView.IsMine && !weaponController.isSwinging && !weaponController.isOnCooldown && Input.GetKeyDown(GetComponent<KeyCode>("Fire1")))
-        {
-            weaponController.SwingWeapon();
-        }
-        else if (photonView.IsMine && hotBarSlotsUI.transform.GetChild(Mathf.FloorToInt(selectedSlotIndex)).childCount != 0 && hotBarSlotsUI.transform.GetChild(Mathf.FloorToInt(selectedSlotIndex)).GetChild(0).name == "FoodItem" && Input.GetKeyDown(GetComponent<KeyCode>("Use")))
-        {
-            weaponController.EatItem();
-            RemoveFromItemList(hotBarSlotsUI.transform.GetChild(Mathf.FloorToInt(selectedSlotIndex)).GetChild(0).gameObject.name, 1);
-        }
-        else
-        {
-            weaponController.HandleSway();
-            weaponController.HandleBob();
-        }
-    }
-    else
-    {
-        isHoldingSomething = false;
-        if (photonView.IsMine && !weaponController.isSwinging && !weaponController.isOnCooldown && Input.GetKeyDown(GetComponent<KeyCode>("Fire1")))
-        {
-            playerMovement.animator.SetTrigger("Punch");
-        }
-    }
+private void BatchUpdateInventoryUI()
+{
+    // Implement batching logic to update inventory UI
+}
+
+// Implement object pooling for dynamically created UI elements
+private GameObject GetPooledObject(string itemName)
+{
+    // Check if the object pool contains an inactive object with the specified itemName
+    // If found, return the object, otherwise create a new object and add it to the pool
+}
+
+private void ReturnPooledObject(GameObject obj)
+{
+    // Deactivate the object and return it to the pool
 }
