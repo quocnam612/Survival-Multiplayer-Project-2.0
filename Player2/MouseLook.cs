@@ -4,34 +4,27 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityStandardAssests.Character.FirstPerson;
 
-public class MouseLook : MonoBehaviour
+public class MouseLook : MonoBehaviour 
 {
-    public float mouseXSensitivity = 130f;
-    public float mouseYSensitivity = 100f;
-    public Transform playerBody;
-
-    [HideInInspector] public float xRotation = 0f;
-    [HideInInspector] public bool unlockMouse;
-
-    void Start()
+    private Vector2 rotation = Vector2.zero;
+    private Transform cachedTransform;
+    
+    void Awake()
     {
-        Cursor.lockState = CursorLockMode.Locked;
-        unlockMouse = false;
+        cachedTransform = transform;
+        // Cache other frequently accessed components
     }
 
     void Update()
     {
-        if (!unlockMouse)
-        {
-            Cursor.lockState = CursorLockMode.Locked;
-            float mouseX = Input.GetAxis("Mouse X") * mouseXSensitivity * Time.deltaTime;
-            float mouseY = Input.GetAxis("Mouse Y") * mouseYSensitivity * Time.deltaTime;
-            xRotation -= mouseY;
-            xRotation = Mathf.Clamp(xRotation, -90f, 90f);
-            playerBody.Rotate(Vector3.up * mouseX);
-        }
-        else {
-            Cursor.lockState = CursorLockMode.None;
-        }
+        if (unlockMouse) return;
+        
+        rotation.x += Input.GetAxisRaw("Mouse X") * mouseXSensitivity * Time.deltaTime;
+        rotation.y = Mathf.Clamp(
+            rotation.y - Input.GetAxisRaw("Mouse Y") * mouseYSensitivity * Time.deltaTime,
+            -90f, 90f
+        );
+        
+        cachedTransform.localEulerAngles = new Vector3(rotation.y, rotation.x, 0);
     }
 }
