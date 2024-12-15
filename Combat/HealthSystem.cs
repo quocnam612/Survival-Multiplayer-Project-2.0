@@ -2,7 +2,7 @@ using Photon.Pun;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class HealthSystem : MonoBehaviourPunCallbacks
+public class HealthSystem : MonoBehaviourPunCallbacks, IPunObservable
 {
     public Slider healthSlider;
     public Slider easeHealthSlider;
@@ -15,23 +15,43 @@ public class HealthSystem : MonoBehaviourPunCallbacks
         health = maxHealth;
         healthSlider.maxValue = maxHealth;
         easeHealthSlider.maxValue = maxHealth;
+        UpdateHealth();
     }
 
-    private void Update()
+    private void UpdateHealth()
     {
-        GetComponent<PhotonView>().RPC(nameof(UpdateHealth), RpcTarget.AllBufferedViaServer);
+        healthSlider.value = health;
+        easeHealthSlider.value = Mathf.Lerp(easeHealthSlider.value, health, lerpSpeed);
     }
 
     [PunRPC]
-    void UpdateHealth () {
-        if (healthSlider.value != health) healthSlider.value = health; 
-        if (healthSlider.value != easeHealthSlider.value) {
-            easeHealthSlider.value = Mathf.Lerp(easeHealthSlider.value, health, lerpSpeed);
+    public void TakeDamage(float damage)
+    {
+        health -= damage;
+        if (photonView.IsMine)
+        {
+            UpdateHealth();
+            photonView.RPC(nameof(SyncHealth), RpcTarget.Others, health);
         }
     }
 
     [PunRPC]
-    void TakeDamage(float damage) {
-        health -= damage;
+    public void SyncHealth(float newHealth)
+    {
+        health = newHealth;
+        UpdateHealth();
+    }
+
+    public void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
+    {
+        if (stream.IsWriting)
+        {
+            stream.SendNext(health);
+        }
+        else
+        {
+            health = (float)stream.ReceiveNext();
+            UpdateHealth();
+        }
     }
 }
