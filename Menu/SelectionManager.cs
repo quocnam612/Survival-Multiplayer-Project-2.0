@@ -6,31 +6,37 @@ public class SelectionManager : MonoBehaviourPunCallbacks
     private Camera playerCamera;
     private Text interaction_text;
     private InteractableObject hitInteractable;
+    private Vector3 lastMousePosition;
 
     private void Awake()
     {
         ray = new Ray();
         playerCamera = GetComponent<Camera>();
         interaction_text = GetComponent<Text>();
+        lastMousePosition = Input.mousePosition;
     }
 
     void Update()
     {
-        ray = playerCamera.ScreenPointToRay(Input.mousePosition);
-        
-        if (Physics.Raycast(ray, out hit, interaction_distance, ~LayerMask.GetMask("Ignore Raycast"))) 
+        if (lastMousePosition != Input.mousePosition)
         {
-            hitInteractable = hit.transform.GetComponent<InteractableObject>();
-            if (hitInteractable != null && hitInteractable != currentInteractable)
+            lastMousePosition = Input.mousePosition;
+            ray = playerCamera.ScreenPointToRay(Input.mousePosition);
+
+            if (Physics.Raycast(ray, out hit, interaction_distance, ~LayerMask.GetMask("Ignore Raycast"))) 
             {
-                currentInteractable = hitInteractable;
-                UpdateInteractionText(hitInteractable);
+                hitInteractable = hit.transform.GetComponent<InteractableObject>();
+                if (hitInteractable != null && hitInteractable != currentInteractable)
+                {
+                    currentInteractable = hitInteractable;
+                    UpdateInteractionText(hitInteractable);
+                }
             }
-        }
-        else if (currentInteractable != null)
-        {
-            interaction_text.enabled = false;
-            currentInteractable = null;
+            else if (currentInteractable != null)
+            {
+                interaction_text.enabled = false;
+                currentInteractable = null;
+            }
         }
     }
 }
