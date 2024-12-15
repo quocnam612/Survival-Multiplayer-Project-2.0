@@ -1,3 +1,11 @@
+using Photon.Pun;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+using UnityStandardAssests.Character.FirstPerson;
+
 public class SelectionManager : MonoBehaviourPunCallbacks
 {
     private InteractableObject currentInteractable;
