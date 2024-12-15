@@ -11,6 +11,7 @@ public class RoomList : MonoBehaviourPunCallbacks
     public GameObject roomListItemPrefab;
 
     private List<RoomInfo> cachedRoomList = new List<RoomInfo>(); 
+    private List<GameObject> roomListItems = new List<GameObject>();
 
     IEnumerator Start()
     {
@@ -39,16 +40,12 @@ public class RoomList : MonoBehaviourPunCallbacks
             foreach (var room in roomList) {
                 for (int i = 0; i < cachedRoomList.Count; i++) {
                     if (cachedRoomList[i].Name == room.Name) {
-                        List<RoomInfo> newList = cachedRoomList;
-
                         if (room.RemovedFromList) {
-                            newList.Remove(newList[i]);
+                            cachedRoomList.RemoveAt(i);
+                        } else {
+                            cachedRoomList[i] = room; 
                         }
-                        else {
-                            newList[i] = room; 
-                        }
-
-                        cachedRoomList = newList;
+                        break;
                     }
                 }
             }
@@ -58,15 +55,24 @@ public class RoomList : MonoBehaviourPunCallbacks
     }
 
     void UpdateUI() {
-        foreach (Transform roomItem in roomListParent) {
-            Destroy(roomItem.gameObject);
+        // Deactivate unused room list items
+        foreach (GameObject roomItem in roomListItems) {
+            roomItem.SetActive(false);
         }
 
-        foreach (var room in cachedRoomList) {
-            GameObject rootItem = Instantiate(roomListItemPrefab, roomListParent);
+        // Activate and update required room list items
+        for (int i = 0; i < cachedRoomList.Count; i++) {
+            GameObject roomItem;
+            if (i < roomListItems.Count) {
+                roomItem = roomListItems[i];
+            } else {
+                roomItem = Instantiate(roomListItemPrefab, roomListParent);
+                roomListItems.Add(roomItem);
+            }
 
-            rootItem.transform.GetChild(0).GetComponent<Text>().text = room.Name;
-            rootItem.transform.GetChild(1).GetComponent<Text>().text = room.PlayerCount + "/16";
+            roomItem.transform.GetChild(0).GetComponent<Text>().text = cachedRoomList[i].Name;
+            roomItem.transform.GetChild(1).GetComponent<Text>().text = cachedRoomList[i].PlayerCount + "/16";
+            roomItem.SetActive(true);
         }
     }
 }
