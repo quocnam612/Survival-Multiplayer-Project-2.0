@@ -1,20 +1,17 @@
-using Photon.Pun;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEngine.UI;
-using UnityStandardAssests.Character.FirstPerson;
-
 public class SelectionManager : MonoBehaviourPunCallbacks
 {
     private InteractableObject currentInteractable;
     private Ray ray;
     private RaycastHit hit;
-    
+    private Camera playerCamera;
+    private Text interaction_text;
+    private InteractableObject hitInteractable;
+
     private void Awake()
     {
         ray = new Ray();
+        playerCamera = GetComponent<Camera>();
+        interaction_text = GetComponent<Text>();
     }
 
     void Update()
@@ -23,11 +20,11 @@ public class SelectionManager : MonoBehaviourPunCallbacks
         
         if (Physics.Raycast(ray, out hit, interaction_distance, ~LayerMask.GetMask("Ignore Raycast"))) 
         {
-            var interactable = hit.transform.GetComponent<InteractableObject>();
-            if (interactable != null && interactable != currentInteractable)
+            hitInteractable = hit.transform.GetComponent<InteractableObject>();
+            if (hitInteractable != null && hitInteractable != currentInteractable)
             {
-                currentInteractable = interactable;
-                UpdateInteractionText(interactable);
+                currentInteractable = hitInteractable;
+                UpdateInteractionText(hitInteractable);
             }
         }
         else if (currentInteractable != null)
