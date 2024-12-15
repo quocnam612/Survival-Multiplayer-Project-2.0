@@ -54,4 +54,12 @@ public class HealthSystem : MonoBehaviourPunCallbacks, IPunObservable
             UpdateHealth();
         }
     }
+
+    public override void OnPlayerEnteredRoom(Photon.Realtime.Player newPlayer)
+    {
+        if (PhotonNetwork.IsMasterClient)
+        {
+            photonView.RPC(nameof(SyncHealth), newPlayer, health);
+        }
+    }
 }
