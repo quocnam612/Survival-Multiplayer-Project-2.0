@@ -1,9 +1,5 @@
 using Photon.Pun;
-using System.Collections;
-using System.IO;
 using UnityEngine;
-using UnityEngine.UI;
-using UnityEngine.UIElements.Experimental;
 
 public class ChoppableCorp : MonoBehaviourPunCallbacks
 {
@@ -11,25 +7,26 @@ public class ChoppableCorp : MonoBehaviourPunCallbacks
     public string prefabPath;
     public bool chopped = false;
 
+    private InventorySystem inventorySystem;
+
+    private void Awake()
+    {
+        inventorySystem = FindObjectOfType<InventorySystem>();
+    }
+
     private void OnTriggerEnter(Collider other)
     {
-        if (other.CompareTag("Hit range") && FindFirstObjectByType<InventorySystem>().handHold.transform.childCount != 0)
+        if (other.CompareTag("Hit range") && inventorySystem.handHold.transform.childCount != 0)
         {
-            if (FindFirstObjectByType<InventorySystem>().handHold.transform.childCount != 0)
-            {
-                healthSystem.gameObject.GetComponent<PhotonView>().RPC("TakeDamage", RpcTarget.AllBufferedViaServer, 15f);
-            }
-            else
-            {
-                healthSystem.gameObject.GetComponent<PhotonView>().RPC("TakeDamage", RpcTarget.AllBufferedViaServer, 3f);
-            }
+            float damage = inventorySystem.handHold.transform.childCount != 0 ? 15f : 3f;
+            healthSystem.gameObject.GetComponent<PhotonView>().RPC("TakeDamage", RpcTarget.AllBufferedViaServer, damage);
 
-            if (healthSystem.health <= 0 && !chopped) {
+            if (healthSystem.health <= 0 && !chopped)
+            {
                 chopped = true;
                 PhotonNetwork.Instantiate(prefabPath, transform.position, transform.rotation);
                 PhotonNetwork.Destroy(gameObject);
             }
         }
     }
-
 }

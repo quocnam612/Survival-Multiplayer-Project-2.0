@@ -1,7 +1,8 @@
+using Photon.Pun;
 using UnityEngine;
 
 [ExecuteAlways]
-public class LightingManager : MonoBehaviour
+public class LightingManager : MonoBehaviourPunCallbacks, IPunObservable
 {
     //Scene References
     [SerializeField] private Light DirectionalLight;
@@ -19,7 +20,7 @@ public class LightingManager : MonoBehaviour
     private float dawn = 6f;
     private float dusk = 18f;
     private float noon = 12f;
-    
+
     private void UpdateLighting(float timePercent)
     {
         //Set ambient and fog
@@ -27,15 +28,13 @@ public class LightingManager : MonoBehaviour
         RenderSettings.fogColor = Preset.FogColor.Evaluate(timePercent);
         RenderSettings.fogDensity = Preset.FogColor.Evaluate(timePercent).a / 69f;
         RenderSettings.skybox.SetColor("_Tint", Preset.SkyColor.Evaluate(timePercent));
-        
+
         //If the directional light is set then rotate and set it's color, I actually rarely use the rotation because it casts tall shadows unless you clamp the value
         if (DirectionalLight != null)
         {
             DirectionalLight.color = Preset.DirectionalColor.Evaluate(timePercent);
-
             DirectionalLight.transform.localRotation = Quaternion.Euler(new Vector3((timePercent * 360f) - 90f, 170f, 0));
         }
-
     }
 
     private void Start()
@@ -50,41 +49,60 @@ public class LightingManager : MonoBehaviour
 
         if (Application.isPlaying)
         {
-            //(Replace with a reference to the game time)
-            // speed up the time in dead of night
-            if (TimeOfDay > nightSpeedUpStart || TimeOfDay < nightSpeedUpEnd) // speed up the passage of night from 9pm to 3am
+            if (PhotonNetwork.IsMasterClient)
             {
-                // TimeOfDay += Time.deltaTime * speedMultiplier * nightSpeed;
-                TimeOfDay += Time.deltaTime * nightSpeed;
-            }
-            else
-            {
-                TimeOfDay += Time.deltaTime * speedMultiplier;
-
-                // adjust light intensity and shadow softness for time of day
-                if (TimeOfDay >= dawn && TimeOfDay <= noon)
+                if (TimeOfDay > nightSpeedUpStart || TimeOfDay < nightSpeedUpEnd)
                 {
-                    DirectionalLight.intensity = baseIntensity + (baseIntensity / (noon - dawn)) * (TimeOfDay - dawn);
-                    DirectionalLight.shadowStrength = minShadowStrength + ((maxShadowStrength - minShadowStrength) / (noon - dawn)) * (TimeOfDay - dawn);
-                }
-                else if (TimeOfDay > noon && TimeOfDay <= dusk)
-                {
-                    DirectionalLight.intensity = baseIntensity + (baseIntensity / (dusk - noon)) * (dusk - TimeOfDay);
-                    DirectionalLight.shadowStrength = minShadowStrength + ((maxShadowStrength - minShadowStrength) / (dusk - noon)) * (dusk - TimeOfDay);
+                    TimeOfDay += Time.deltaTime * nightSpeed;
                 }
                 else
                 {
-                    DirectionalLight.intensity = baseIntensity;
-                    DirectionalLight.shadowStrength = minShadowStrength;
+                    TimeOfDay += Time.deltaTime * speedMultiplier;
 
+                    if (TimeOfDay >= dawn && TimeOfDay <= noon)
+                    {
+                        DirectionalLight.intensity = baseIntensity + (baseIntensity / (noon - dawn)) * (TimeOfDay - dawn);
+                        DirectionalLight.shadowStrength = minShadowStrength + ((maxShadowStrength - minShadowStrength) / (noon - dawn)) * (TimeOfDay - dawn);
+                    }
+                    else if (TimeOfDay > noon && TimeOfDay <= dusk)
+                    {
+                        DirectionalLight.intensity = baseIntensity + (baseIntensity / (dusk - noon)) * (dusk - TimeOfDay);
+                        DirectionalLight.shadowStrength = minShadowStrength + ((maxShadowStrength - minShadowStrength) / (dusk - noon)) * (dusk - TimeOfDay);
+                    }
+                    else
+                    {
+                        DirectionalLight.intensity = baseIntensity;
+                        DirectionalLight.shadowStrength = minShadowStrength;
+                    }
                 }
+                TimeOfDay %= 24;
+
+                photonView.RPC("SyncTimeOfDay", RpcTarget.Others, TimeOfDay);
             }
-            TimeOfDay %= 24; //Modulus to ensure always between 0-24
             UpdateLighting(TimeOfDay / 24f);
         }
         else
         {
             UpdateLighting(TimeOfDay / 24f);
+        }
+    }
+
+    [PunRPC]
+    private void SyncTimeOfDay(float newTimeOfDay)
+    {
+        TimeOfDay = newTimeOfDay;
+        UpdateLighting(TimeOfDay / 24f);
+    }
+
+    public void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
+    {
+        if (stream.IsWriting)
+        {
+            stream.SendNext(TimeOfDay);
+        }
+        else
+        {
+            TimeOfDay = (float)stream.ReceiveNext();
         }
     }
 }
